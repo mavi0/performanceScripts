@@ -3,6 +3,7 @@ Scripts to monitor network performance
 
 ## Dependancies
 
-sudo apt install python3 iperf3
-
+```bash
+sudo apt install -y python3 iperf3 screen
 pip install pingparsing
+```
