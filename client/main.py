@@ -9,11 +9,12 @@ config.sections()
 config.read('main.conf')
 config.sections()
 
-client.duration = 3
+client.duration = 10
 client.server_hostname = config['DEFAULT']['Hostname']
 client.port = config['DEFAULT']['Port']
 client.protocol = 'udp'
-client.blksize = 2048
+# client.blksize = 2048
+client.num_streams = 20
 
 # print('Connecting to {0}:{1}'.format(client.server_hostname, client.port))
 result = client.run()
