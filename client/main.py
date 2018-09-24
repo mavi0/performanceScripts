@@ -47,7 +47,7 @@ json_hostname = client.server_hostname.replace(".", "_")                        
 ping_json_hostname = {}
 ping_json_hostname[json_hostname] = ping_json.pop(client.server_hostname)
 
-with open('ping.json_hostname' , 'w') as ping_file:
+with open('ping.json' , 'w') as ping_file:
         json.dump(ping_json_hostname, ping_file)
 
 print("Complete!\n\nPerforming speetest.net test....")
