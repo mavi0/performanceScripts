@@ -44,6 +44,7 @@ print("Complete!\n\nPerforming latency test....")
 ping_json = json.loads(check_output(["pingparsing", client.server_hostname]))
 ping_json[client.server_hostname]['jitter'] = ping_json[client.server_hostname]["rtt_max"] - ping_json[client.server_hostname]["rtt_min"]
 json_hostname = client.server_hostname.replace(".", "_")                        #fix for zabbix. cant escape periods
+ping_json_hostname = {}
 ping_json_hostname[json_hostname] = ping_json.pop(client.server_hostname)
 
 with open('ping.json_hostname' , 'w') as ping_file:
