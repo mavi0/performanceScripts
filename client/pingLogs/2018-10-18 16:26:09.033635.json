@@ -1,0 +1,1 @@
+{"164_132_43_137": {"packet_loss_count": 0, "packet_receive": 10, "packet_loss_rate": 0.0, "rtt_avg": 23.945, "destination": "164.132.43.137", "packet_transmit": 10, "packet_duplicate_rate": 0.0, "rtt_min": 12.933, "rtt_max": 53.778, "packet_duplicate_count": 0, "rtt_mdev": 16.782, "jitter": 40.845}}

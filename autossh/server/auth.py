@@ -4,10 +4,18 @@ import configparser
 import sys
 import json
 
+print(sys.argv[1])
+
 with open('clients.json') as c:
     clients = json.load(c)
 
-print(clients["test"])
+# print(clients["test"])
+els = list(clients.values())
+print(els[-1])
+
+
+
+
 #
 # print("Complete!\n\nPerforming latency test....")
 # ping_json = json.loads(check_output(["pingparsing", client.server_hostname]))
