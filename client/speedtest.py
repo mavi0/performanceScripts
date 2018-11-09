@@ -30,4 +30,6 @@ with open('speedtest.json' , 'w') as speedtest_file:
 with open('speedtestLogs/%s.json' % time, 'w') as speedtest_log:
         json.dump(speedtest_json, speedtest_log)
 
+print(json.dumps(speedtest_json))
+
 logging.info("Complete!\n")
