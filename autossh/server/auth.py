@@ -9,7 +9,7 @@ print(sys.argv[1])
 with open('clients.json') as c:
     clients = json.load(c)
 
-# print(clients["test"])
+print(clients["test"])
 els = list(clients.values())
 print(els[-1])
 
