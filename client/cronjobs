@@ -1,0 +1,2 @@
+*/10 * * * * /home/arisaie/performanceScripts/client && bash main.sh 2>&1 | tee log.txt
+@hourly cd /home/arisaie/gStreamerParser/ && bash test.sh
