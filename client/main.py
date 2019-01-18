@@ -71,12 +71,9 @@ with open('pingLogs/%s.json' % time, 'w') as ping_log:
 
 print("Complete!\n\nPerforming speetest.net test....")
 
-try:
-    speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
-except subprocess.CalledProcessError as e:
-    speedtest_json =
-with open('speedtest.json', 'w') as speedtest_file:
-    json.dump(speedtest_json, speedtest_file)
+speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
+with open('speedtest.json' , 'w') as speedtest_file:
+        json.dump(speedtest_json, speedtest_file)
 
 with open('speedtestLogs/%s.json' % time, 'w') as speedtest_log:
     json.dump(speedtest_json, speedtest_log)
