@@ -1,2 +1,2 @@
-*/5 * * * * cd /home/arisaie/performanceScripts/client && bash main.sh 2>&1 | tee log.txt
-@hourly cd /home/arisaie/gStreamerParser/ && bash test.sh
+*/5 * * * * cd /home/arisaie/perf/performanceScripts/client && bash main.sh 2>&1 | tee log.txt
+@hourly cd /home/arisaie/perf/gStreamerParser/ && bash test.sh
