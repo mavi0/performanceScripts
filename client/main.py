@@ -14,12 +14,12 @@ config.sections()
 config.read('main.conf')
 config.sections()
 
-duration = 20
-protocol = 'tcp'
-blksize = 2048
-num_streams = 4
-base_port = int(config['DEFAULT']['Port'])
-server_hostname = config['DEFAULT']['Hostname']
+duration = int(config['DEFAULT']['duration'])
+protocol = config['DEFAULT']['protocol']
+blksize = int(config['DEFAULT']['blksize'])
+num_streams = int(config['DEFAULT']['num_streams'])
+base_port = int(config['DEFAULT']['port'])
+server_hostname = config['DEFAULT']['hostname']
 
 
 def iperf(port):
@@ -52,30 +52,41 @@ def iperf(port):
         with open('iperfLogs/%s.json' % time, 'w') as iperf_log:
             json.dump(result.json, iperf_log)
 
+try:
+    iperf(base_port)
+except:
+    print("There was an error performing the iPerf test. Proceeding...")
+    pass
 
-iperf(base_port)
+try:
+    print("Complete!\n\nPerforming latency test....")
+    ping_json = json.loads(check_output(["pingparsing", server_hostname]))
+    ping_json[server_hostname]['jitter'] = ping_json[server_hostname]["rtt_max"] - ping_json[server_hostname]["rtt_min"]
+    # fix for zabbix. cant escape periods
+    json_hostname = server_hostname.replace(".", "_")
+    ping_json_hostname = {}
+    ping_json_hostname[json_hostname] = ping_json.pop(server_hostname)
 
-print("Complete!\n\nPerforming latency test....")
-ping_json = json.loads(check_output(["pingparsing", server_hostname]))
-ping_json[server_hostname]['jitter'] = ping_json[server_hostname]["rtt_max"] - ping_json[server_hostname]["rtt_min"]
-# fix for zabbix. cant escape periods
-json_hostname = server_hostname.replace(".", "_")
-ping_json_hostname = {}
-ping_json_hostname[json_hostname] = ping_json.pop(server_hostname)
+    with open('ping.json', 'w') as ping_file:
+        json.dump(ping_json_hostname, ping_file)
 
-with open('ping.json', 'w') as ping_file:
-    json.dump(ping_json_hostname, ping_file)
+    with open('pingLogs/%s.json' % time, 'w') as ping_log:
+        json.dump(ping_json_hostname, ping_log)
+except:
+    print("There was an error performing the latency test. Proceeding...")
+    pass
 
-with open('pingLogs/%s.json' % time, 'w') as ping_log:
-    json.dump(ping_json_hostname, ping_log)
+try:
+    print("Complete!\n\nPerforming speetest.net test....")
 
-print("Complete!\n\nPerforming speetest.net test....")
+    speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
+    with open('speedtest.json' , 'w') as speedtest_file:
+            json.dump(speedtest_json, speedtest_file)
 
-speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
-with open('speedtest.json' , 'w') as speedtest_file:
-        json.dump(speedtest_json, speedtest_file)
+    with open('speedtestLogs/%s.json' % time, 'w') as speedtest_log:
+        json.dump(speedtest_json, speedtest_log)
 
-with open('speedtestLogs/%s.json' % time, 'w') as speedtest_log:
-    json.dump(speedtest_json, speedtest_log)
-
+except:
+    print("There was an error performing the speedtest test. Proceeding...")
+    pass
 print("Complete!\n")
