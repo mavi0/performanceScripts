@@ -7,24 +7,28 @@ from datetime import datetime
 from time import sleep
 
 # TO DO: also save json files to unique file, for logs. ALSO retry iperf when can't connect
-config = configparser.ConfigParser()
+
 time = datetime.now()
 
-config.sections()
-config.read('main.conf')
-config.sections()
-
-duration = int(config['DEFAULT']['duration'])
-protocol = config['DEFAULT']['protocol']
-blksize = int(config['DEFAULT']['blksize'])
-num_streams = int(config['DEFAULT']['num_streams'])
-base_port = int(config['DEFAULT']['port'])
-server_hostname = config['DEFAULT']['hostname']
+server_hostname = ""
 
 
-def iperf(port):
+def iperf(config_file):
+    global server_hostname
+    config = configparser.ConfigParser()
+    config.sections()
+    config.read(config_file)
+    config.sections()
+
+    duration = int(config['DEFAULT']['duration'])
+    protocol = config['DEFAULT']['protocol']
+    blksize = int(config['DEFAULT']['blksize'])
+    num_streams = int(config['DEFAULT']['num_streams'])
+    base_port = int(config['DEFAULT']['port'])
+    server_hostname = config['DEFAULT']['hostname']
+    
+    port = base_port
     client = iperf3.Client()
-    print("Performing iperf test.....")
     client.duration = duration
     client.server_hostname = server_hostname
     client.port = port
@@ -36,7 +40,7 @@ def iperf(port):
     result = client.run()
     if result.error:
         print(result.error)
-        # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success
+        # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success. Sure, this could have a negative impact on performance but most of the networks we're testing are sub 100Mbit/s
         port += 1
         if port > base_port + 4:
             port = base_port
@@ -45,17 +49,39 @@ def iperf(port):
         sleep(1)
         iperf(port)
     else:
+        return result.json
 
-        with open('iperf.json', 'w') as iperf_file:
-            json.dump(result.json, iperf_file)
+def save_json(json_export, file_name, log_dir):
+    with open('%s' % file_name, 'w') as out_file:
+        json.dump(json_export, out_file)
 
-        with open('iperfLogs/%s.json' % time, 'w') as iperf_log:
-            json.dump(result.json, iperf_log)
+    log_file = log_dir + '/' + str(time) + '.json'
+    with open(log_file, 'w') as out_log:
+        json.dump(json_export, out_log)
+
+
+def iperfTCP():
+    print("Performing iperf TCP test.....")
+    result = iperf("main.conf")
+    save_json(result, "iperf.json", "iperfLogs")
+
+
+def iperfUDP():
+    print("Performing iperf UDP test.....")
+    result = iperf("udp.conf")
+    save_json(result, "iperfUDP.json", "iperfLogsUDP")
+
 
 try:
-    iperf(base_port)
+    iperfTCP()
 except:
-    print("There was an error performing the iPerf test. Proceeding...")
+    print("There was an error performing the TCP iPerf test. Proceeding...")
+    pass
+
+try:
+    iperfUDP()
+except:
+    print("There was an error performing the UDP iPerf test. Proceeding...")
     pass
 
 try:
@@ -67,11 +93,8 @@ try:
     ping_json_hostname = {}
     ping_json_hostname[json_hostname] = ping_json.pop(server_hostname)
 
-    with open('ping.json', 'w') as ping_file:
-        json.dump(ping_json_hostname, ping_file)
+    save_json(ping_json_hostname, "ping.json", "pingLogs")
 
-    with open('pingLogs/%s.json' % time, 'w') as ping_log:
-        json.dump(ping_json_hostname, ping_log)
 except:
     print("There was an error performing the latency test. Proceeding...")
     pass
@@ -80,11 +103,7 @@ try:
     print("Complete!\n\nPerforming speetest.net test....")
 
     speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
-    with open('speedtest.json' , 'w') as speedtest_file:
-            json.dump(speedtest_json, speedtest_file)
-
-    with open('speedtestLogs/%s.json' % time, 'w') as speedtest_log:
-        json.dump(speedtest_json, speedtest_log)
+    save_json(speedtest_json, "speedtest.json", "speedtestLogs")
 
 except:
     print("There was an error performing the speedtest test. Proceeding...")
