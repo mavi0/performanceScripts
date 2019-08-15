@@ -13,7 +13,8 @@ time = datetime.now()
 server_hostname = ""
 
 
-def iperf(config_file):
+def iperf(config_file, config_port):
+
     global server_hostname
     config = configparser.ConfigParser()
     config.sections()
@@ -27,7 +28,10 @@ def iperf(config_file):
     base_port = int(config['DEFAULT']['port'])
     server_hostname = config['DEFAULT']['hostname']
     
-    port = base_port
+    port = config_port
+    if config_port < 1:
+        port = base_port
+    
     client = iperf3.Client()
     client.duration = duration
     client.server_hostname = server_hostname
@@ -47,7 +51,7 @@ def iperf(config_file):
 
         print("Retrying on port %s" % port)
         sleep(1)
-        iperf(port)
+        iperf(config_file, port)
     else:
         return result.json
 
@@ -62,13 +66,13 @@ def save_json(json_export, file_name, log_dir):
 
 def iperfTCP():
     print("Performing iperf TCP test.....")
-    result = iperf("main.conf")
+    result = iperf("main.conf", 0)
     save_json(result, "iperf.json", "iperfLogs")
 
 
 def iperfUDP():
     print("Performing iperf UDP test.....")
-    result = iperf("udp.conf")
+    result = iperf("udp.conf", 0)
     save_json(result, "iperfUDP.json", "iperfLogsUDP")
 
 
