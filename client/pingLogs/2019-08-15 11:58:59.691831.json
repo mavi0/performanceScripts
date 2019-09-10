@@ -1,0 +1,1 @@
+{"194_80_38_133": {"destination": "194.80.38.133", "packet_transmit": 10, "packet_receive": 10, "packet_loss_count": 0, "packet_loss_rate": 0.0, "rtt_min": 1.108, "rtt_avg": 1.237, "rtt_max": 1.378, "rtt_mdev": 0.079, "packet_duplicate_count": 0, "packet_duplicate_rate": 0.0, "jitter": 0.2699999999999998}}
