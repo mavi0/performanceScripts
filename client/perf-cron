@@ -1,0 +1,1 @@
+*/5 * * * * cd /perfclient bash main.sh 2>&1 | tee /log/perf.txt

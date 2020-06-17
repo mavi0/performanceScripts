@@ -1,0 +1,52 @@
+version: "3.7"
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 30 performancescripts gstreamerparser
+
+    performancescripts:
+        image: mavi0/performancescripts:latest
+        container_name: performancescripts
+        networks:
+          - monitor-services
+          - default
+        environment:
+          - PUID=${PUID}
+          - PGID=${PGID}
+          - TZ=${TZ}
+          - CLIENT_ID=${CLIENT_ID}
+          - HOSTNAME=${HOSTNAME}
+          - DURATION=${DURATION}
+          - PROTOCOL=${PROTOCOL}
+          - NUM_STREAMS=${NUM_STREAMS}
+          - PORT=${PORT}
+        volumes:
+          - ${LOG_DIR}:/log
+          - ${SHARE_DIR}:/share
+        restart: unless-stopped
+
+    performancescripts:
+        image: mavi0/performancescripts:latest
+        container_name: performancescripts
+        networks:
+            - monitor-services
+            - default
+        environment:
+            - PUID=${PUID}
+            - PGID=${PGID}
+            - TZ=${TZ}
+            - CLIENT_ID=${CLIENT_ID}
+            - HOSTNAME=${HOSTNAME}
+            - DURATION=${DURATION}
+            - PROTOCOL=${PROTOCOL}
+            - NUM_STREAMS=${NUM_STREAMS}
+            - PORT=${PORT}
+        restart: unless-stopped
+    
+    networks:
+      monitor-services:
+        external: true
+      default:

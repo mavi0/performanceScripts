@@ -1,47 +1,40 @@
-import time
+import time, os, errno
 import configparser
 import iperf3
 import json
+import coloredlogs, logging
 from subprocess import check_output
 from datetime import datetime
 from time import sleep
 
-# TO DO: also save json files to unique file, for logs. ALSO retry iperf when can't connect
+logger = logging.getLogger(__name__)
+coloredlogs.install(level='DEBUG', logger=logger)
 
 time = datetime.now()
 
-server_hostname = ""
+host_id = os.environ['HOSTNAME']
+client_id = os.environ['CLIENT_ID']
 
-
-def iperf(config_file, config_port):
-
-    global server_hostname
-    config = configparser.ConfigParser()
-    config.sections()
-    config.read(config_file)
-    config.sections()
-
-    duration = int(config['DEFAULT']['duration'])
-    protocol = config['DEFAULT']['protocol']
-    blksize = int(config['DEFAULT']['blksize'])
-    num_streams = int(config['DEFAULT']['num_streams'])
-    base_port = int(config['DEFAULT']['port'])
-    server_hostname = config['DEFAULT']['hostname']
-    
+def iperf(config_port):
+    duration = os.environ['DURATION']
+    protocol = os.environ['PROTOCOL']
+    blksize = int(os.environ['BLKSIZE'])
+    num_streams = int(os.environ['NUM_STREAMS'])
+    base_port = int(os.environ['PORT'])
     port = config_port
+
     if config_port < 1:
         port = base_port
-    
+
     client = iperf3.Client()
     client.duration = duration
-    client.server_hostname = server_hostname
+    client.host_id = host_id
     client.port = port
     client.protocol = protocol
     client.blksize = blksize
     client.num_streams = num_streams
-
-    # print('Connecting to {0}:{1}'.format(client.server_hostname, client.port))
     result = client.run()
+
     if result.error:
         print(result.error)
         # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success. Sure, this could have a negative impact on performance but most of the networks we're testing are sub 100Mbit/s
@@ -49,67 +42,69 @@ def iperf(config_file, config_port):
         if port > base_port + 4:
             port = base_port
 
-        print("Retrying on port %s" % port)
+        logger.warning("Retrying on port %s" % port)
         sleep(1)
-        iperf(config_file, port)
+        iperf(port)
     else:
         return result.json
 
-def save_json(json_export, file_name, log_dir):
-    with open('%s' % file_name, 'w') as out_file:
-        json.dump(json_export, out_file)
 
-    log_file = log_dir + '/' + str(time) + '.json'
-    with open(log_file, 'w') as out_log:
-        json.dump(json_export, out_log)
-
-
-def iperfTCP():
-    print("Performing iperf TCP test.....")
-    result = iperf("main.conf", 0)
-    save_json(result, "iperf.json", "iperfLogs")
+def check_filename(filename):
+    if not os.path.exists(os.path.dirname(filename)):
+        try:
+            os.makedirs(os.path.dirname(filename))
+        except OSError as exc: # Guard against race condition
+            if exc.errno != errno.EEXIST:
+                raise
 
 
-def iperfUDP():
-    print("Performing iperf UDP test.....")
-    result = iperf("udp.conf", 0)
-    save_json(result, "iperfUDP.json", "iperfLogsUDP")
+output = {}
 
+output["host_id"] = host_id
+output["client_id"] = client_id
+output["datetime"] = time
 
 try:
-    iperfTCP()
+    logger.info("Performing Iperf Test..")
+    output["iperf"] = iperf(0)
 except:
-    print("There was an error performing the TCP iPerf test. Proceeding...")
+    logger.warning(
+        "There was an error performing the TCP iPerf test. Proceeding...")
     pass
 
 try:
-    iperfUDP()
+    logger.info("Complete!\n\nPerforming latency test....")
+    ping_json = json.loads(check_output(["pingparsing", host_id]))
+    ping_json[host_id]['jitter'] = ping_json[host_id]["rtt_max"] - ping_json[
+        host_id]["rtt_min"]
+    output["ping"] = ping_json
+
 except:
-    print("There was an error performing the UDP iPerf test. Proceeding...")
+    logger.warning(
+        "There was an error performing the latency test. Proceeding...")
     pass
 
 try:
-    print("Complete!\n\nPerforming latency test....")
-    ping_json = json.loads(check_output(["pingparsing", server_hostname]))
-    ping_json[server_hostname]['jitter'] = ping_json[server_hostname]["rtt_max"] - ping_json[server_hostname]["rtt_min"]
-    # fix for zabbix. cant escape periods
-    json_hostname = server_hostname.replace(".", "_")
-    ping_json_hostname = {}
-    ping_json_hostname[json_hostname] = ping_json.pop(server_hostname)
-
-    save_json(ping_json_hostname, "ping.json", "pingLogs")
-
-except:
-    print("There was an error performing the latency test. Proceeding...")
-    pass
-
-try:
-    print("Complete!\n\nPerforming speetest.net test....")
+    logger.info("Complete!\n\nPerforming speetest.net test....")
 
     speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
-    save_json(speedtest_json, "speedtest.json", "speedtestLogs")
+    output["speedtest"] = speedtest_json
 
 except:
-    print("There was an error performing the speedtest test. Proceeding...")
+    logger.warning(
+        "There was an error performing the speedtest test. Proceeding...")
     pass
-print("Complete!\n")
+
+perf_file = "/share/perf.json"
+log_file = "/log/" + str(time) + ".json"
+
+check_filename(perf_file)
+check_filename(log_file)
+
+with open('%s' % perf_file, 'w') as f:
+    json.dump(output, f)
+
+with open('%s' % log_file, 'w') as f:
+    json.dump(output, f)
+
+logger.info("Complete!\n")
