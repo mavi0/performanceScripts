@@ -1,52 +1,73 @@
-version: "3.7"
+version: "3.3"
 
 services:
   watchtower:
+    container_name: watchtower
     image: containrrr/watchtower:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 30 performancescripts gstreamerparser
+    command: --interval 30 performancescripts gstreamerparser telegraf
 
-    performancescripts:
-        image: mavi0/performancescripts:latest
-        container_name: performancescripts
-        networks:
-          - monitor-services
-          - default
-        environment:
-          - PUID=${PUID}
-          - PGID=${PGID}
-          - TZ=${TZ}
-          - CLIENT_ID=${CLIENT_ID}
-          - HOSTNAME=${HOSTNAME}
-          - DURATION=${DURATION}
-          - PROTOCOL=${PROTOCOL}
-          - NUM_STREAMS=${NUM_STREAMS}
-          - PORT=${PORT}
-        volumes:
-          - ${LOG_DIR}:/log
-          - ${SHARE_DIR}:/share
-        restart: unless-stopped
-
-    performancescripts:
-        image: mavi0/performancescripts:latest
-        container_name: performancescripts
-        networks:
-            - monitor-services
-            - default
-        environment:
-            - PUID=${PUID}
-            - PGID=${PGID}
-            - TZ=${TZ}
-            - CLIENT_ID=${CLIENT_ID}
-            - HOSTNAME=${HOSTNAME}
-            - DURATION=${DURATION}
-            - PROTOCOL=${PROTOCOL}
-            - NUM_STREAMS=${NUM_STREAMS}
-            - PORT=${PORT}
-        restart: unless-stopped
-    
+  performancescripts:
+    image: mavi0/performancescripts:latest
+    container_name: performancescripts
     networks:
-      monitor-services:
-        external: true
-      default:
+      - monitor-services
+      - default
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - INTERVAL=${INTERVAL}
+      - CLIENT_ID=${CLIENT_ID}
+      - HOSTNAME=${HOSTNAME}
+      - DURATION=${DURATION}
+      - PROTOCOL=${PROTOCOL}
+      - NUM_STREAMS=${NUM_STREAMS}
+      - PORT=${PORT}
+    volumes:
+      - ${LOG_DIR}:/log
+      - ${SHARE_DIR}:/share
+    restart: unless-stopped
+
+  gstreamerparser:
+    image: mavi0/gstreamerparser:latest
+    container_name: gstreamerparser
+    networks:
+      - monitor-services
+      - default
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - INTERVAL=${QOE_INTERVAL}
+      - CLIENT_ID=${CLIENT_ID}
+    volumes:
+      - ${LOG_DIR}:/log
+      - ${SHARE_DIR}:/share
+    restart: unless-stopped
+  
+  telegraf:
+    image: telegraf:1.14-alpine
+    container_name: telegraf
+    networks:
+      - monitor-services
+      - default
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - HOST_PROC=/host/proc
+    volumes:
+      - ${LOG_DIR}:/log
+      - ${SHARE_DIR}:/share
+      - ${TELEGRAF_CONF}:/etc/telegraf/telegraf.conf:ro
+      - /proc:/host/proc:ro
+    restart: unless-stopped
+
+  
+networks:
+  monitor-services:
+    external: true
+  default:
+    driver: bridge

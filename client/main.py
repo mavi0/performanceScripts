@@ -13,19 +13,30 @@ coloredlogs.install(level='DEBUG', logger=logger)
 class Perf:
     def __init__(self):
         self.__time = datetime.now()
-        # Try to load vars from env. If not
-        self.__host_id = self.__load_vars(os.environ['HOSTNAME'], "perf.manyproject.uk")
-        self.__client_id = self.__load_vars(os.environ['CLIENT_ID'], "default-id")
-        self.__duration = self.__load_vars_int(os.environ['DURATION'], 20)
-        self.__protocol = self.__load_vars(os.environ['PROTOCOL'], "tcp")
-        self.__blksize = self.__load_vars_int(os.environ['BLKSIZE'], 2048)
-        self.__num_streams = self.__load_vars_int(os.environ['NUM_STREAMS'], 4)
-        self.__base_port = self.__load_vars_int(os.environ['PORT'], 5201)
-        self.__interval = self.__load_vars_int(os.environ['INTERVAL'], 300)
+        # Try to load vars from env. If not, load defaults
+        try:
+            self.__host_id = os.environ['HOST_ID']
+            self.__client_id = os.environ['CLIENT_ID']
+            self.__duration =  int(os.environ['DURATION'])
+            self.__protocol = os.environ['PROTOCOL']
+            self.__blksize =  int(os.environ['BLKSIZE'])
+            self.__num_streams =  int(os.environ['NUM_STREAMS'])
+            self.__base_port =  int(os.environ['PORT'])
+            self.__interval = int(os.environ['INTERVAL'])
+        except:
+            self.__host_id = "perf.manyproject.uk"
+            self.__client_id = "default-id"
+            self.__duration = 20
+            self.__protocol = "tcp"
+            self.__blksize = 2048
+            self.__num_streams = 4
+            self.__base_port = 5201
+            self.__interval = 300
+
         self.__output = {}
         self.__output["host_id"] = self.__host_id
         self.__output["client_id"] = self.__client_id
-        self.__output["datetime"] = self.__time
+        self.__output["datetime"] = str(self.__time)
 
     def __load_vars(self, env_var, default):
         try:
@@ -42,7 +53,13 @@ class Perf:
         except:
             return default
 
-    def __iperf(self, config_port):
+    def __iperf(self, config_port, attempt):
+        if attempt > 40:
+            logger.error("Exceeded iperf retry.")
+            return
+
+        attempt += 1 
+
         port = config_port
 
         if config_port < 1:
@@ -66,26 +83,28 @@ class Perf:
 
             logger.warning("Retrying on port %s" % port)
             sleep(1)
-            self.__iperf(port)
+            self.__iperf(port, attempt)
         else:
             return result.json
     
     def iperf_test(self):
         try:
             logger.info("Performing Iperf Test..")
-            self.__output["iperf"] = self.__iperf(0)
+            self.__output["iperf"] = self.__iperf(0, 0)
+            logger.info("Complete!")
         except:
             logger.warning(
-                "There was an error performing the TCP iPerf test. Proceeding...")
+                "There was an error performing the iperf test. Proceeding...")
             pass
 
     def ping_test(self):
         try:
-            logger.info("Complete!\n\nPerforming latency test....")
+            logger.info("Performing latency test....")
             ping_json = json.loads(check_output(["pingparsing", self.__host_id]))
             ping_json[self.__host_id]['jitter'] = ping_json[self.__host_id]["rtt_max"] - ping_json[
                 self.__host_id]["rtt_min"]
             self.__output["ping"] = ping_json
+            logger.info("Complete!")
 
         except:
             logger.warning(
@@ -94,10 +113,11 @@ class Perf:
 
     def speedtest_test(self):
         try:
-            logger.info("Complete!\n\nPerforming speetest.net test....")
+            logger.info("Performing speetest.net test....")
 
             speedtest_json = json.loads(check_output(["speedtest-cli", "--json"]))
             self.__output["speedtest"] = speedtest_json
+            logger.info("Complete!")
 
         except:
             logger.warning(
@@ -130,6 +150,8 @@ if __name__ == "__main__":
         
         perf_file = "/share/perf.json"
         log_file = "/log/" + str(perf.get_time()) + ".json"
+        
+        logger.info("Exporting logs to " + perf_file + " and " + log_file)
         check_filename(perf_file)
         check_filename(log_file)
 
@@ -139,6 +161,6 @@ if __name__ == "__main__":
         with open('%s' % log_file, 'w') as f:
             json.dump(perf.get_output(), f)
 
-        logger.info("Complete!\n")
+        logger.info("Complete!\nSleeping for " + str(perf.get_interval()) + " secs.")
 
         sleep(perf.get_interval())
