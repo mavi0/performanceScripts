@@ -1,4 +1,4 @@
-import time, os, errno
+import time, os, errno, copy
 import configparser
 import iperf3
 import json
@@ -6,6 +6,7 @@ import coloredlogs, logging
 from subprocess import check_output
 from datetime import datetime
 from time import sleep
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG', logger=logger)
@@ -14,25 +15,16 @@ class Perf:
     def __init__(self):
         self.__time = datetime.now()
         # Try to load vars from env. If not, load defaults
-        try:
-            self.__host_id = os.environ['HOST_ID']
-            self.__client_id = os.environ['CLIENT_ID']
-            self.__duration =  int(os.environ['DURATION'])
-            self.__protocol = os.environ['PROTOCOL']
-            self.__blksize =  int(os.environ['BLKSIZE'])
-            self.__num_streams =  int(os.environ['NUM_STREAMS'])
-            self.__base_port =  int(os.environ['PORT'])
-            self.__interval = int(os.environ['INTERVAL'])
-        except:
-            self.__host_id = "perf.manyproject.uk"
-            self.__client_id = "default-id"
-            self.__duration = 20
-            self.__protocol = "tcp"
-            self.__blksize = 2048
-            self.__num_streams = 4
-            self.__base_port = 5201
-            self.__interval = 300
-
+        self.__host_id = os.environ.get('HOST_ID', "perf.manyproject.uk")
+        self.__client_id = os.environ.get('CLIENT_ID', "default-id")
+        self.__duration =  int(os.environ.get('DURATION', 20))
+        self.__iperf_retry =  int(os.environ.get('IPERF_RETRY', 40))
+        self.__protocol = os.environ.get('PROTOCOL', "TCP")
+        self.__blksize =  int(os.environ.get('BLKSIZE', 2048))
+        self.__num_streams =  int(os.environ.get('NUM_STREAMS', 4))
+        self.__base_port =  int(os.environ.get('PORT', 5206))
+        self.__port_range =  int(os.environ.get('PORT_RANGE', 4))
+        self.__interval = int(os.environ.get('INTERVAL', 300))
         self.__output = {}
         self.__output["host_id"] = self.__host_id
         self.__output["client_id"] = self.__client_id
@@ -54,42 +46,37 @@ class Perf:
             return default
 
     def __iperf(self, config_port, attempt):
-        if attempt > 40:
-            logger.error("Exceeded iperf retry.")
-            return
+        attempt = 0
+        port = copy.deepcopy(self.__base_port)
+        for attempt in range(self.__iperf_retry):            
+            attempt += 1 
+            logger.info("Performing Iperf Test on port: %s" % port)
+            client = iperf3.Client()
+            client.duration = self.__duration
+            client.server_hostname = self.__host_id
+            client.port = port
+            client.protocol = self.__protocol
+            client.blksize = self.__blksize
+            client.num_streams = self.__num_streams
+            result = client.run()
 
-        attempt += 1 
+            if result.error:
+                print(result.error)
+                # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success. Sure, this could have a negative impact on performance but most of the networks we're testing are sub 100Mbit/s
+                port += 1
+                if port > self.__base_port + self.__port_range:
+                    port = copy.deepcopy(self.__base_port)
 
-        port = config_port
-
-        if config_port < 1:
-            port = self.__base_port
-
-        client = iperf3.Client()
-        client.duration = self.__duration
-        client.host_id = self.__host_id
-        client.port = port
-        client.protocol = self.__protocol
-        client.blksize = self.__blksize
-        client.num_streams = self.__num_streams
-        result = client.run()
-
-        if result.error:
-            print(result.error)
-            # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success. Sure, this could have a negative impact on performance but most of the networks we're testing are sub 100Mbit/s
-            port += 1
-            if port > self.__base_port + 4:
-                port = self.__base_port
-
-            logger.warning("Retrying on port %s" % port)
-            sleep(1)
-            self.__iperf(port, attempt)
-        else:
-            return result.json
+                logger.warning("Retrying on port %s" % port)
+                sleep(1)
+            else:
+                return result.json
+        
+        logger.error("Exceeded iperf retry.")
+        return
     
     def iperf_test(self):
         try:
-            logger.info("Performing Iperf Test..")
             self.__output["iperf"] = self.__iperf(0, 0)
             logger.info("Complete!")
         except:
@@ -142,6 +129,7 @@ def check_filename(filename):
                 raise
 
 if __name__ == "__main__":
+    Path('/share/perf.json').touch()
     while True:
         perf = Perf()
         perf.iperf_test()
