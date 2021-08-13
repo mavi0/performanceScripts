@@ -16,7 +16,7 @@ services:
     command: --interval 30 performancescripts gstreamerparser telegraf
 
   performancescripts:
-    image: mavi0/performancescripts:latest
+    image: ghcr.io/mavi0/performancescripts:latest
     container_name: performancescripts
     networks:
       - monitor-services
