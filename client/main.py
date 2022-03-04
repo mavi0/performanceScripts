@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime
 from time import sleep
 from pathlib import Path
+import speedtest
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG', logger=logger)
@@ -113,6 +114,31 @@ class Perf:
             logger.warning(
                 "There was an error performing the speedtest test. Proceeding...")
             pass
+
+    def ookla_speedtest(self):
+        try:
+            logger.info("Performing ookla speedtest....")
+            servers = []
+            # If you want to test against a specific server
+            # servers = [1234]
+            threads = None
+            # If you want to use a single threaded test
+            # threads = 1
+            s = speedtest.Speedtest()
+            s.get_servers(servers)
+            s.get_best_server()
+            s.download(threads=threads)
+            s.upload(threads=threads)
+            s.results.share()
+            results_dict = s.results.dict()
+            # speedtest_json = json.loads(results_dict.decode('utf-8'))
+            self.__output["ookla"] = results_dict
+            logger.info("Complete!")
+        except Exception as e:
+            logger.info(e)
+            logger.warning(
+                "There was an error performing the ookla speedtest test. Proceeding...")
+            pass
     
     def get_output(self):
         return self.__output
@@ -138,6 +164,7 @@ if __name__ == "__main__":
         # perf.iperf_test()
         perf.ping_test()
         perf.librespeed_test()
+        perf.ookla_speedtest()
         
         perf_file = "/share/perf.json"
         log_file = "/log/" + str(perf.get_time()) + ".json"

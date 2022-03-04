@@ -1,8 +1,8 @@
 FROM golang:1.17rc2-stretch
 
-RUN apt-get update && apt-get -y install -qq --force-yes python python-pip python3-pip speedtest-cli golang-go git
+RUN apt-get update && apt-get -y install -qq --force-yes python python-pip python3-pip golang-go git 
 
-RUN pip3 install iperf3 pingparsing coloredlogs
+RUN pip3 install iperf3 pingparsing coloredlogs speedtest-cli
 
 WORKDIR /perfclient
 
