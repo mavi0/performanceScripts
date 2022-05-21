@@ -8,6 +8,7 @@ from datetime import datetime
 from time import sleep
 from pathlib import Path
 import speedtest
+# from playsound import playsound
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG', logger=logger)
@@ -18,13 +19,13 @@ class Perf:
         # Try to load vars from env. If not, load defaults
         self.__host_id = os.environ.get('HOST_ID', "perf.manyproject.uk")
         self.__client_id = os.environ.get('CLIENT_ID', "default-id")
-        # self.__duration =  int(os.environ.get('DURATION', 20))
-        # self.__iperf_retry =  int(os.environ.get('IPERF_RETRY', 40))
-        # self.__protocol = os.environ.get('PROTOCOL', "TCP")
-        # self.__blksize =  int(os.environ.get('BLKSIZE', 2048))
-        # self.__num_streams =  int(os.environ.get('NUM_STREAMS', 4))
-        # self.__base_port =  int(os.environ.get('PORT', 5206))
-        # self.__port_range =  int(os.environ.get('PORT_RANGE', 4))
+        self.__duration =  int(os.environ.get('DURATION', 20))
+        self.__iperf_retry =  int(os.environ.get('IPERF_RETRY', 40))
+        self.__protocol = os.environ.get('PROTOCOL', "TCP")
+        self.__blksize =  int(os.environ.get('BLKSIZE', 2048))
+        self.__num_streams =  int(os.environ.get('NUM_STREAMS', 4))
+        self.__base_port =  int(os.environ.get('PORT', 5206))
+        self.__port_range =  int(os.environ.get('PORT_RANGE', 4))
         self.__interval = int(os.environ.get('INTERVAL', 300))
         self.__output = {}
         self.__output["host_id"] = self.__host_id
@@ -86,33 +87,35 @@ class Perf:
     #         pass
 
     def ping_test(self):
-        try:
-            logger.info("Performing latency test....")
-            ping_json = json.loads(subprocess.check_output(["pingparsing", self.__host_id]).decode('utf-8'))
-            ping_json[self.__host_id]['jitter'] = ping_json[self.__host_id]["rtt_max"] - ping_json[
-                self.__host_id]["rtt_min"]
-            self.__output["ping"] = ping_json
-            logger.info("Complete!")
+        # try:
+        logger.info("Performing latency test....")
+        ping_json = json.loads(subprocess.check_output(["pingparsing", self.__host_id]).decode('utf-8'))
+        ping_json[self.__host_id]['jitter'] = ping_json[self.__host_id]["rtt_max"] - ping_json[
+            self.__host_id]["rtt_min"]
+        self.__output["ping"] = ping_json
+        logger.info("Complete!")
 
-        except Exception as e:
-            logger.info(e)
-            logger.warning(
-                "There was an error performing the latency test. Proceeding...")
-            pass
+        # except Exception as e:
+        #     logger.info(e)
+        #     os.system("afplay latency.mp3")
+        #     logger.warning(
+        #         "There was an error performing the latency test. Proceeding...")
+        #     pass
 
     def librespeed_test(self):
         try:
             logger.info("Performing librespeed test....")
-            proc = subprocess.Popen(["/perfclient/speedtest-cli/out/librespeed-cli-linux-amd64", "--local-json", "servers.json", "--json"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.Popen(["librespeed-cli", "--local-json", "servers.json", "--json"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = proc.communicate()
-            speedtest_json = json.loads(err.decode('utf-8'))
+            speedtest_json = json.loads(out.decode('utf-8'))
             self.__output["librespeed"] = speedtest_json
             logger.info("Complete!")
 
         except Exception as e:
             logger.info(e)
+            os.system("afplay librespeed.mp3")
             logger.warning(
-                "There was an error performing the speedtest test. Proceeding...")
+                "There was an error performing the librespeed test. Proceeding...")
             pass
 
     def ookla_speedtest(self):
@@ -158,27 +161,30 @@ def check_filename(filename):
                 raise
 
 if __name__ == "__main__":
-    Path('/share/perf.json').touch()
+    Path('perf.json').touch()
     while True:
+        os.system("afplay 10.mp3")
+        # sleep(10)
         perf = Perf()
         # perf.iperf_test()
         perf.ping_test()
         perf.librespeed_test()
-        perf.ookla_speedtest()
+        # perf.ookla_speedtest()
         
-        perf_file = "/share/perf.json"
-        log_file = "/log/" + str(perf.get_time()) + ".json"
+        # perf_file = "perf.json"
+        log_file = "log/" + str(perf.get_time()) + ".json"
         
-        logger.info("Exporting logs to " + perf_file + " and " + log_file)
-        check_filename(perf_file)
+        logger.info("Exporting logs to " + log_file)
+        # check_filename(perf_file)
         check_filename(log_file)
 
-        with open('%s' % perf_file, 'w') as f:
-            json.dump(perf.get_output(), f)
+        # with open('%s' % perf_file, 'w') as f:
+        #     json.dump(perf.get_output(), f)
 
         with open('%s' % log_file, 'w') as f:
             json.dump(perf.get_output(), f)
 
         logger.info("Complete!\nSleeping for " + str(perf.get_interval()) + " secs.")
+        os.system("afplay complete.mp3")
 
         sleep(perf.get_interval())

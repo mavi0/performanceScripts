@@ -2,7 +2,7 @@
     {
       "id": 1,
       "name": "CORE, Quickline Communications",
-      "server": "//151.249.75.134",
+      "server": "//doncaster.manyproject.uk",
       "dlURL": "garbage.php",
       "ulURL": "empty.php",
       "pingURL": "empty.php",
