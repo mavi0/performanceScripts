@@ -40,7 +40,6 @@ class MikrotikBtest:
             allow_agent=False,
             look_for_keys=False,
         )
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         logger.info("Connected to: " + self.__cpe_uname + "@" + self.__cpe_hostname)
         logger.info("Performing Receive test..")
