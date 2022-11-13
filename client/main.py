@@ -1,6 +1,5 @@
 import time, os, errno, copy
-import configparser
-# import iperf3
+import iperf3
 import json
 import coloredlogs, logging
 import subprocess
@@ -8,6 +7,8 @@ from datetime import datetime
 from time import sleep
 from pathlib import Path
 import speedtest
+from mikrotik import MikrotikBtest
+
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG', logger=logger)
@@ -18,13 +19,13 @@ class Perf:
         # Try to load vars from env. If not, load defaults
         self.__host_id = os.environ.get('HOST_ID', "perf.manyproject.uk")
         self.__client_id = os.environ.get('CLIENT_ID', "default-id")
-        # self.__duration =  int(os.environ.get('DURATION', 20))
-        # self.__iperf_retry =  int(os.environ.get('IPERF_RETRY', 40))
-        # self.__protocol = os.environ.get('PROTOCOL', "TCP")
-        # self.__blksize =  int(os.environ.get('BLKSIZE', 2048))
-        # self.__num_streams =  int(os.environ.get('NUM_STREAMS', 4))
-        # self.__base_port =  int(os.environ.get('PORT', 5206))
-        # self.__port_range =  int(os.environ.get('PORT_RANGE', 4))
+        self.__duration =  int(os.environ.get('DURATION', 20))
+        self.__iperf_retry =  int(os.environ.get('IPERF_RETRY', 40))
+        self.__protocol = os.environ.get('PROTOCOL', "UDP")
+        self.__blksize =  int(os.environ.get('BLKSIZE', 2048))
+        self.__num_streams =  int(os.environ.get('NUM_STREAMS', 4))
+        self.__base_port =  int(os.environ.get('PORT', 5201))
+        self.__port_range =  int(os.environ.get('PORT_RANGE', 4))
         self.__interval = int(os.environ.get('INTERVAL', 300))
         self.__output = {}
         self.__output["host_id"] = self.__host_id
@@ -46,44 +47,79 @@ class Perf:
     #     except:
     #         return default
 
-    # def __iperf(self, config_port, attempt):
-    #     attempt = 0
-    #     port = copy.deepcopy(self.__base_port)
-    #     for attempt in range(self.__iperf_retry):            
-    #         attempt += 1 
-    #         logger.info("Performing Iperf Test on port: %s" % port)
-    #         client = iperf3.Client()
-    #         client.duration = self.__duration
-    #         client.server_hostname = self.__host_id
-    #         client.port = port
-    #         client.protocol = self.__protocol
-    #         client.blksize = self.__blksize
-    #         client.num_streams = self.__num_streams
-    #         result = client.run()
+    def mikrotik_btest(self):
+        m = MikrotikBtest()
+        self.__output["mikrotik"] = m.get_output()
 
-    #         if result.error:
-    #             print(result.error)
-    #             # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success. Sure, this could have a negative impact on performance but most of the networks we're testing are sub 100Mbit/s
-    #             port += 1
-    #             if port > self.__base_port + self.__port_range:
-    #                 port = copy.deepcopy(self.__base_port)
 
-    #             logger.warning("Retrying on port %s" % port)
-    #             sleep(1)
-    #         else:
-    #             return result.json
+    def __iperf(self):
+        attempt = 0
+        port = copy.deepcopy(self.__base_port)
+        for attempt in range(self.__iperf_retry):            
+            attempt += 1 
+            # if self.__protocol == "TCP":
+            #     logger.info("Performing TCP Iperf Test on port: %s" % port)
+            #     client = iperf3.Client()
+            #     client.duration = self.__duration
+            #     client.server_hostname = self.__host_id
+            #     client.port = port
+            #     client.protocol = self.__protocol
+            #     client.blksize = self.__blksize
+            #     client.num_streams = self.__num_streams
+            #     result = client.run()
+            if self.__protocol == "UDP":
+                logger.info("Performing UDP Iperf Test on port: %s" % port)
+                attempt = 0
+                for attempt in range(self.__iperf_retry):
+                    dl_json = json.loads(subprocess.check_output(["iperf3", "-c", self.__host_id, "-i", "1", "-l", "1300", "-b", "600M", "-t", "10", "-R", "-u", "-J"]).decode('utf-8'))
+                    if "end" in dl_json: break
+                    if "error" in dl_json:
+                        attempt += 1
+                        logger.info("error - the server is busy running a test. Attempt: %s" % attempt)
+                        if attempt == self.__iperf_retry: 
+                            raise Exception("Too many retries perfroming UDP download") 
+                        sleep(6)
+                for attempt in range(self.__iperf_retry):
+                    ul_json = json.loads(subprocess.check_output(["iperf3", "-c", self.__host_id, "-i", "1", "-l", "1300", "-b", "600M", "-t", "10", "-u", "-J"]).decode('utf-8'))
+                    if "end" in ul_json: break
+                    if "error" in ul_json:
+                        attempt += 1
+                        logger.info("error - the server is busy running a test. Attempt: %s" % attempt)
+                        if attempt == self.__iperf_retry: 
+                            raise Exception("Too many retries perfroming UDP download")
+                        sleep(6)
+
+                iperf_json = {}
+                iperf_json["udp_dl"] = dl_json
+                iperf_json["udp_ul"] = ul_json
+                return iperf_json
+  
+            else:
+                raise Exception("Incompatible Iperf port specified: " + self.__protocol) 
+
+            # if result.error:
+            #     print(result.error)
+            #     # if the server is busy try a new port - there are 4 daemons running. Iterate though these until we get a success. Sure, this could have a negative impact on performance but most of the networks we're testing are sub 100Mbit/s
+            #     port += 1
+            #     if port > self.__base_port + self.__port_range:
+            #         port = copy.deepcopy(self.__base_port)
+
+            #     logger.warning("Retrying on port %s" % port)
+            #     sleep(1)
+            # else:
+            #     return result.json
         
-    #     logger.error("Exceeded iperf retry.")
-    #     return
+        return ""
     
-    # def iperf_test(self):
-    #     try:
-    #         self.__output["iperf"] = self.__iperf(0, 0)
-    #         logger.info("Complete!")
-    #     except:
-    #         logger.warning(
-    #             "There was an error performing the iperf test. Proceeding...")
-    #         pass
+    def iperf_test(self):
+        try:
+            self.__output["iperf"] = self.__iperf()
+            logger.info("Complete!")
+        except Exception as e:
+            logger.warning(e)
+            logger.warning(
+                "There was an error performing the iperf test. Proceeding...")
+            pass
 
     def ping_test(self):
         try:
@@ -158,26 +194,29 @@ def check_filename(filename):
                 raise
 
 if __name__ == "__main__":
-    Path('/share/perf.json').touch()
+    # Path('/share/perf.json').touch()
     while True:
         perf = Perf()
-        # perf.iperf_test()
-        perf.ping_test()
-        perf.librespeed_test()
-        perf.ookla_speedtest()
-        
-        perf_file = "/share/perf.json"
-        log_file = "/log/" + str(perf.get_time()) + ".json"
-        
-        logger.info("Exporting logs to " + perf_file + " and " + log_file)
-        check_filename(perf_file)
-        check_filename(log_file)
+        # perf.mikrotik_btest()
+        # perf.ping_test()
+        # perf.librespeed_test()
+        # perf.ookla_speedtest()
+        perf.iperf_test()
 
-        with open('%s' % perf_file, 'w') as f:
-            json.dump(perf.get_output(), f)
+        print(perf.get_output())
+        
+        # perf_file = "/share/perf.json"
+        # log_file = "/log/" + str(perf.get_time()) + ".json"
+        
+        # logger.info("Exporting logs to " + perf_file + " and " + log_file)
+        # check_filename(perf_file)
+        # check_filename(log_file)
 
-        with open('%s' % log_file, 'w') as f:
-            json.dump(perf.get_output(), f)
+        # with open('%s' % perf_file, 'w') as f:
+        #     json.dump(perf.get_output(), f)
+
+        # with open('%s' % log_file, 'w') as f:
+        #     json.dump(perf.get_output(), f)
 
         logger.info("Complete!\nSleeping for " + str(perf.get_interval()) + " secs.")
 
